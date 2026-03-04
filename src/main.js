@@ -1,19 +1,7 @@
 import Phaser from 'phaser';
+import MapGenerator from './MapGenerator.js';
 
-const TILE_SIZE = 16; // tamaño en píxeles de cada celda
-
-const map = [
-  ['#','#','#','#','#','#','#','#','#','#'],
-  ['#','.','.','.','.','.','.','.','.','#'],
-  ['#','.','.','.','.','.','.','.','.','#'],
-  ['#','.','.','.','.','.','.','.','.','#'],
-  ['#','.','.','.','.','.','.','.','.','#'],
-  ['#','.','.','.','.','.','.','.','.','#'],
-  ['#','.','.','.','.','.','.','.','.','#'],
-  ['#','.','.','.','.','.','.','.','.','#'],
-  ['#','.','.','.','.','.','.','.','.','#'],
-  ['#','#','#','#','#','#','#','#','#','#'],
-];
+const TILE_SIZE = 16;
 
 class GameScene extends Phaser.Scene {
   constructor() {
@@ -21,16 +9,22 @@ class GameScene extends Phaser.Scene {
   }
 
   create() {
-    // Posición inicial del jugador (en celdas, no píxeles)
-    this.playerX = 1;
-    this.playerY = 1;
+    // Generamos el mapa proceduralmente
+    const generator = new MapGenerator(50, 37);
+    const { map, rooms } = generator.generate();
+    this.map = map;
+
+    // Spawn en el centro de la primera habitación
+    const startRoom = rooms[0];
+    this.playerX = Math.floor(startRoom.x + startRoom.w / 2);
+    this.playerY = Math.floor(startRoom.y + startRoom.h / 2);
 
     // Renderizar el mapa
     this.mapTexts = [];
-    for (let y = 0; y < map.length; y++) {
+    for (let y = 0; y < this.map.length; y++) {
       this.mapTexts[y] = [];
-      for (let x = 0; x < map[y].length; x++) {
-        const tile = map[y][x];
+      for (let x = 0; x < this.map[y].length; x++) {
+        const tile = this.map[y][x];
         const color = tile === '#' ? '#888888' : '#444444';
         const text = this.add.text(x * TILE_SIZE, y * TILE_SIZE, tile, {
           fontSize: '16px',
@@ -45,17 +39,14 @@ class GameScene extends Phaser.Scene {
     this.playerText = this.add.text(
       this.playerX * TILE_SIZE,
       this.playerY * TILE_SIZE,
-      '@',
-      { fontSize: '16px', color: '#00ff00', fontFamily: 'monospace' }
+      '@', { fontSize: '16px', color: '#00ff00', fontFamily: 'monospace' }
     );
 
-    // Capturar teclado
     this.cursors = this.input.keyboard.createCursorKeys();
-    this.lastMove = 0; // para controlar la velocidad del movimiento
+    this.lastMove = 0;
   }
 
   update(time) {
-    // Movimiento cada 150ms para que no vaya disparado
     if (time - this.lastMove < 150) return;
 
     let newX = this.playerX;
@@ -66,8 +57,7 @@ class GameScene extends Phaser.Scene {
     if (this.cursors.up.isDown)    newY--;
     if (this.cursors.down.isDown)  newY++;
 
-    // Solo mover si la celda destino no es una pared
-    if (map[newY][newX] !== '#') {
+    if (this.map[newY][newX] !== '#') {
       this.playerX = newX;
       this.playerY = newY;
       this.playerText.setPosition(newX * TILE_SIZE, newY * TILE_SIZE);
