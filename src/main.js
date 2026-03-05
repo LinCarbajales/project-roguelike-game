@@ -1,7 +1,23 @@
 import Phaser from 'phaser';
 import MapGenerator from './MapGenerator.js';
+import FOV from './FOV.js';
 
 const TILE_SIZE = 16;
+const FOV_RADIUS = 6; // radio de la antorcha en celdas
+
+// Colores según visibilidad y tipo de celda
+const COLORS = {
+  wall: {
+    visible:  '#aaaaaa',
+    explored: '#444444',
+    hidden:   '#000000'
+  },
+  floor: {
+    visible:  '#888888',
+    explored: '#222222',
+    hidden:   '#000000'
+  }
+};
 
 class GameScene extends Phaser.Scene {
   constructor() {
@@ -9,26 +25,24 @@ class GameScene extends Phaser.Scene {
   }
 
   create() {
-    // Generamos el mapa proceduralmente
     const generator = new MapGenerator(50, 37);
     const { map, rooms } = generator.generate();
     this.map = map;
 
-    // Spawn en el centro de la primera habitación
     const startRoom = rooms[0];
     this.playerX = Math.floor(startRoom.x + startRoom.w / 2);
     this.playerY = Math.floor(startRoom.y + startRoom.h / 2);
 
-    // Renderizar el mapa
+    // Inicializamos el FOV
+    this.fov = new FOV(this.map);
+
+    // Renderizar el mapa, todo oculto al principio
     this.mapTexts = [];
     for (let y = 0; y < this.map.length; y++) {
       this.mapTexts[y] = [];
       for (let x = 0; x < this.map[y].length; x++) {
-        const tile = this.map[y][x];
-        const color = tile === '#' ? '#888888' : '#444444';
-        const text = this.add.text(x * TILE_SIZE, y * TILE_SIZE, tile, {
+        const text = this.add.text(x * TILE_SIZE, y * TILE_SIZE, ' ', {
           fontSize: '16px',
-          color: color,
           fontFamily: 'monospace'
         });
         this.mapTexts[y][x] = text;
@@ -44,6 +58,33 @@ class GameScene extends Phaser.Scene {
 
     this.cursors = this.input.keyboard.createCursorKeys();
     this.lastMove = 0;
+
+    // Calculamos el FOV inicial
+    this.updateFOV();
+  }
+
+  updateFOV() {
+    // Calculamos qué celdas son visibles desde la posición del jugador
+    this.fov.compute(this.playerX, this.playerY, FOV_RADIUS);
+
+    // Actualizamos el aspecto visual de cada celda según su visibilidad
+    for (let y = 0; y < this.map.length; y++) {
+      for (let x = 0; x < this.map[y].length; x++) {
+        const tile = this.map[y][x];
+        const visibility = this.fov.visibility[y][x];
+        const isWall = tile === '#';
+
+        const colorSet = isWall ? COLORS.wall : COLORS.floor;
+        const color = colorSet[visibility];
+
+        if (visibility === 'hidden') {
+          this.mapTexts[y][x].setText(' ');
+        } else {
+          this.mapTexts[y][x].setText(tile);
+          this.mapTexts[y][x].setColor(color);
+        }
+      }
+    }
   }
 
   update(time) {
@@ -62,6 +103,9 @@ class GameScene extends Phaser.Scene {
       this.playerY = newY;
       this.playerText.setPosition(newX * TILE_SIZE, newY * TILE_SIZE);
       this.lastMove = time;
+
+      // Recalculamos el FOV cada vez que el jugador se mueve
+      this.updateFOV();
     }
   }
 }
