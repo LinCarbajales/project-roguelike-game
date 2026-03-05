@@ -86,12 +86,38 @@ export default class MapGenerator {
   }
 
   connectRooms(map, rooms) {
-    // Conectamos cada habitación con la siguiente en orden
-    for (let i = 0; i < rooms.length - 1; i++) {
-      const a = this.getRoomCenter(rooms[i]);
-      const b = this.getRoomCenter(rooms[i + 1]);
+    const sorted = this.sortRoomsByProximity(rooms);
+
+    for (let i = 0; i < sorted.length - 1; i++) {
+      const a = this.getRoomCenter(sorted[i]);
+      const b = this.getRoomCenter(sorted[i + 1]);
       this.carveTunnel(map, a, b);
     }
+  }
+
+  sortRoomsByProximity(rooms) {
+    const remaining = [...rooms];
+    const sorted = [remaining.splice(0, 1)[0]];
+
+    while (remaining.length > 0) {
+      const last = this.getRoomCenter(sorted[sorted.length - 1]);
+      let closestIndex = 0;
+      let closestDistance = Infinity;
+
+      for (let i = 0; i < remaining.length; i++) {
+        const candidate = this.getRoomCenter(remaining[i]);
+        const distance = Math.abs(candidate.x - last.x) + Math.abs(candidate.y - last.y);
+
+        if (distance < closestDistance) {
+          closestDistance = distance;
+          closestIndex = i;
+        }
+      }
+
+      sorted.push(remaining.splice(closestIndex, 1)[0]);
+    }
+
+    return sorted;
   }
 
   getRoomCenter(room) {
