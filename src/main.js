@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import MapGenerator from './MapGenerator.js';
 import FOV from './FOV.js';
+import Enemy from './Enemy.js';
 
 const TILE_SIZE = 16;
 const FOV_RADIUS = 6; // radio de la antorcha en celdas
@@ -59,6 +60,15 @@ class GameScene extends Phaser.Scene {
     this.cursors = this.input.keyboard.createCursorKeys();
     this.lastMove = 0;
 
+    // Spawneamos un enemigo en el centro de cada habitación excepto la primera
+    this.enemies = [];
+    for (let i = 1; i < rooms.length; i++) {
+      const room = rooms[i];
+      const ex = Math.floor(room.x + room.w / 2);
+      const ey = Math.floor(room.y + room.h / 2);
+      this.enemies.push(new Enemy(ex, ey, this));
+    }
+
     // Calculamos el FOV inicial
     this.updateFOV();
   }
@@ -85,6 +95,9 @@ class GameScene extends Phaser.Scene {
         }
       }
     }
+    if (this.enemies) {
+      this.enemies.forEach(enemy => enemy.updateVisibility(this.fov.visibility));
+    }
   }
 
   update(time) {
@@ -106,6 +119,12 @@ class GameScene extends Phaser.Scene {
 
       // Recalculamos el FOV cada vez que el jugador se mueve
       this.updateFOV();
+
+      // Turno de los enemigos
+      this.enemies.forEach(enemy => {
+        enemy.takeTurn(this.playerX, this.playerY, this.map);
+        enemy.updateVisibility(this.fov.visibility);
+      });
     }
   }
 }
