@@ -6,6 +6,15 @@ import Combat from './Combat.js';
 
 const TILE_SIZE = 16;
 const FOV_RADIUS = 6;
+const ENEMY_MOVE_INTERVAL = 250;
+const ENEMY_ATTACK_INTERVAL = 500;
+const GOBLIN_ATTACKS = [
+  'apuñala',
+  'raja',
+  'muerde',
+  'patea',
+  'acuchilla'
+];
 
 const COLORS = {
   wall:  { visible: '#aaaaaa', explored: '#444444', hidden: '#000000' },
@@ -33,6 +42,10 @@ class GameScene extends Phaser.Scene {
       attack: 6,
       defense: 2
     };
+
+    // Acciones de los enemigos
+    this.lastEnemyMove = 0;
+    this.lastEnemyAttack = 0;
 
     this.fov = new FOV(this.map);
     this.log = []; // historial de mensajes de combate
@@ -109,6 +122,10 @@ class GameScene extends Phaser.Scene {
     return this.enemies.find(e => e.alive && e.x === x && e.y === y);
   }
 
+  getRandomAttack(actions) {
+    return actions[Math.floor(Math.random() * actions.length)];
+  }
+
   handleCombat(enemy) {
     // Jugador ataca al enemigo
     const playerResult = Combat.fight(this.player, enemy);
@@ -118,14 +135,6 @@ class GameScene extends Phaser.Scene {
       enemy.die();
       this.addLog('El goblin ha muerto.');
       return;
-    }
-
-    // El enemigo contraataca
-    const enemyResult = Combat.fight(enemy, this.player);
-    this.addLog(`El goblin te golpea por ${enemyResult.damage} de daño.`);
-
-    if (enemyResult.defeated) {
-      this.scene.start('GameOverScene');
     }
   }
 
@@ -140,24 +149,32 @@ class GameScene extends Phaser.Scene {
     if (this.cursors.up.isDown)    newY--;
     if (this.cursors.down.isDown)  newY++;
 
-    if (newX === this.playerX && newY === this.playerY) return;
+    const playerActed = newX !== this.playerX || newY !== this.playerY;
 
-    if (this.map[newY][newX] === '#') return;
+    if (playerActed && this.map[newY][newX] !== '#') {
+      this.lastMove = time;
+      const enemy = this.getEnemyAt(newX, newY);
 
-    this.lastMove = time;
-    const enemy = this.getEnemyAt(newX, newY);
-
-    if (enemy) {
-      // Hay un enemigo: combate en lugar de moverse
-      this.handleCombat(enemy);
+      if (enemy) {
+        this.handleCombat(enemy);
+      } else {
+        this.playerX = newX;
+        this.playerY = newY;
+        this.playerText.setPosition(newX * TILE_SIZE, newY * TILE_SIZE);
+      }
+    } else if (!playerActed) {
+      this.lastMove = time;
     } else {
-      // Casilla libre: moverse
-      this.playerX = newX;
-      this.playerY = newY;
-      this.playerText.setPosition(newX * TILE_SIZE, newY * TILE_SIZE);
+      return;
     }
 
-    // Turno de los enemigos
+    // Turno de los enemigos con su propio intervalo
+    const enemyCanMove = time - this.lastEnemyMove >= ENEMY_MOVE_INTERVAL;
+    const enemyCanAttack = time - this.lastEnemyAttack >= ENEMY_ATTACK_INTERVAL;
+
+    if (enemyCanMove) this.lastEnemyMove = time;
+    if (enemyCanAttack) this.lastEnemyAttack = time;
+
     this.enemies.forEach(enemy => {
       if (!enemy.alive) return;
 
@@ -166,7 +183,22 @@ class GameScene extends Phaser.Scene {
         ...this.enemies.filter(e => e !== enemy)
       ];
 
-      enemy.takeTurn(this.playerX, this.playerY, this.map, blockers);
+      const distX = Math.abs(enemy.x - this.playerX);
+      const distY = Math.abs(enemy.y - this.playerY);
+      const adjacent = distX + distY === 1;
+
+      if (adjacent && enemyCanAttack) {
+        const enemyResult = Combat.fight(enemy, this.player);
+        const action = this.getRandomAttack(GOBLIN_ATTACKS);
+        this.addLog(`El goblin te ${action} y te hace ${enemyResult.damage} de daño.`);
+        if (enemyResult.defeated) {
+          this.scene.start('GameOverScene');
+          return;
+        }
+      } else if (!adjacent && enemyCanMove) {
+        enemy.takeTurn(this.playerX, this.playerY, this.map, blockers);
+      }
+
       enemy.updateVisibility(this.fov.visibility);
     });
 
