@@ -1,16 +1,15 @@
 export default class Enemy {
-  constructor(x, y, scene) {
+  constructor(x, y, scene, config = {}) {
     this.x = x;
     this.y = y;
-    this.symbol = 'g';
-    this.color = '#ff6600';
-    this.visionRadius = 6;
+    this.symbol = config.symbol || 'g';
+    this.color = config.color || '#ff6600';
+    this.visionRadius = config.visionRadius || 6;
 
-    // Stats de combate
-    this.hp = 10;
-    this.maxHp = 10;
-    this.attack = 4;
-    this.defense = 1;
+    this.hp = config.hp || 10;
+    this.maxHp = config.hp || 10;
+    this.attack = config.attack || 4;
+    this.defense = config.defense || 1;
     this.alive = true;
 
     this.text = scene.add.text(
