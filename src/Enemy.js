@@ -3,6 +3,7 @@ export default class Enemy {
     this.x = x;
     this.y = y;
     this.symbol = config.symbol || 'g';
+    this.name = config.name || 'enemigo';
     this.color = config.color || '#ff6600';
     this.visionRadius = config.visionRadius || 6;
 

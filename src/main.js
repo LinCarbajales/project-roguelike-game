@@ -9,6 +9,7 @@ const TILE_SIZE = 16;
 const FOV_RADIUS = 6;
 const ENEMY_MOVE_INTERVAL = 250;
 const ENEMY_ATTACK_INTERVAL = 500;
+const ATTACK_COOLDOWN = 300;
 const PLAYER_ATTACKS = [
   'Apuñalas',
   'Aplastas con tu maza',
@@ -48,6 +49,7 @@ class GameScene extends Phaser.Scene {
     }
     this.player = this.registry.get('player');
 
+    this.lastAttack = 0;
     this.lastEnemyMove = 0;
     this.lastEnemyAttack = 0;
     this.fov = new FOV(this.map);
@@ -72,6 +74,13 @@ class GameScene extends Phaser.Scene {
       this.playerY * TILE_SIZE,
       '@', { fontSize: '16px', color: '#00ff00', fontFamily: 'monospace' }
     ).setDepth(2);
+
+    // Objeto visual de la espada, invisible por defecto
+    this.swordText = this.add.text(0, 0, '/', {
+      fontSize: '16px',
+      color: '#ffffff',
+      fontFamily: 'monospace'
+    }).setDepth(3).setVisible(false);
 
     // Enemigos según configuración del nivel
     this.enemies = [];
@@ -154,6 +163,13 @@ class GameScene extends Phaser.Scene {
     }).setScrollFactor(0).setDepth(10);
 
     this.cursors = this.input.keyboard.createCursorKeys();
+    this.wasd = {
+      up:    this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W),
+      down:  this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S),
+      left:  this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A),
+      right: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D),
+    };
+
     this.lastMove = 0;
 
     this.updateFOV();
@@ -186,53 +202,91 @@ class GameScene extends Phaser.Scene {
     // Jugador ataca al enemigo
     const playerResult = Combat.fight(this.player, enemy);
     const action = this.getRandomAttack(PLAYER_ATTACKS);
-    this.addLog(`${action} al goblin y le haces ${playerResult.damage} de daño.`);
+    this.addLog(`${action} al ${enemy.name} y le haces ${playerResult.damage} de daño.`);
 
     if (playerResult.defeated) {
       enemy.die();
-      this.addLog('El goblin ha muerto.');
+      this.addLog(`El ${enemy.name} ha muerto.`);
       return;
     }
   }
 
+  handleDirectionalAttack(dx, dy, time) {
+    if (time - this.lastAttack < ATTACK_COOLDOWN) return;
+
+    const targetX = this.playerX + dx;
+    const targetY = this.playerY + dy;
+
+    let symbol;
+    if (dy === 0) {
+      symbol = dx > 0 ? '/' : '\\';
+    } else {
+      symbol = dy > 0 ? '\\' : '/';
+    }
+
+    this.swordText.setText(symbol);
+    this.swordText.setPosition(targetX * TILE_SIZE, targetY * TILE_SIZE);
+    this.swordText.setVisible(true);
+    this.time.delayedCall(80, () => this.swordText.setVisible(false));
+
+    this.lastAttack = time;
+
+    const enemy = this.getEnemyAt(targetX, targetY);
+    if (enemy) {
+      this.handleCombat(enemy);
+    } else {
+      this.addLog('Golpeas el aire.');
+    }
+  }
+
   update(time) {
-    if (time - this.lastMove < 150) return;
+    // Movimiento con cursor keys
+    if (time - this.lastMove >= 150) {
+      let newX = this.playerX;
+      let newY = this.playerY;
 
-    let newX = this.playerX;
-    let newY = this.playerY;
+      if (this.cursors.left.isDown)  newX--;
+      if (this.cursors.right.isDown) newX++;
+      if (this.cursors.up.isDown)    newY--;
+      if (this.cursors.down.isDown)  newY++;
 
-    if (this.cursors.left.isDown)  newX--;
-    if (this.cursors.right.isDown) newX++;
-    if (this.cursors.up.isDown)    newY--;
-    if (this.cursors.down.isDown)  newY++;
+      const playerMoved = newX !== this.playerX || newY !== this.playerY;
 
-    const playerActed = newX !== this.playerX || newY !== this.playerY;
-
-    if (playerActed && this.map[newY][newX] !== '#') {
-      this.lastMove = time;
-      const enemy = this.getEnemyAt(newX, newY);
-
-      if (enemy) {
-        this.handleCombat(enemy);
-      } else {
+      if (playerMoved && this.map[newY][newX] !== '#') {
+        // Comprobar que no hay enemigo vivo en la casilla destino
+        const enemyInWay = this.getEnemyAt(newX, newY);
+        if (enemyInWay) return;
+        
+        this.lastMove = time;
         this.playerX = newX;
         this.playerY = newY;
         this.playerText.setPosition(newX * TILE_SIZE, newY * TILE_SIZE);
 
-        // ¿El jugador pisa la escalera?
         if (newX === this.stairsX && newY === this.stairsY) {
           const nextLevelIndex = (this.levelIndex + 1) % LEVELS.length;
           this.registry.set('levelIndex', nextLevelIndex);
           this.scene.restart();
+          return;
         }
+      } else if (!playerMoved) {
+        this.lastMove = time;
       }
-    } else if (!playerActed) {
-      this.lastMove = time;
-    } else {
-      return;
     }
 
-    // Turno de los enemigos con su propio intervalo
+    // Ataque con WASD
+    if (this.wasd.left.isDown)  this.handleDirectionalAttack(-1,  0, time);
+    if (this.wasd.right.isDown) this.handleDirectionalAttack( 1,  0, time);
+    if (this.wasd.up.isDown)    this.handleDirectionalAttack( 0, -1, time);
+    if (this.wasd.down.isDown)  this.handleDirectionalAttack( 0,  1, time);
+
+    // Turno enemigo — siempre independiente
+    this.triggerEnemyTurn(time);
+
+    this.updateFOV();
+    this.updateUI();
+  }
+
+  triggerEnemyTurn(time) {
     const enemyCanMove = time - this.lastEnemyMove >= ENEMY_MOVE_INTERVAL;
     const enemyCanAttack = time - this.lastEnemyAttack >= ENEMY_ATTACK_INTERVAL;
 
@@ -254,7 +308,7 @@ class GameScene extends Phaser.Scene {
       if (adjacent && enemyCanAttack) {
         const enemyResult = Combat.fight(enemy, this.player);
         const action = this.getRandomAttack(GOBLIN_ATTACKS);
-        this.addLog(`El goblin te ${action} y te hace ${enemyResult.damage} de daño.`);
+        this.addLog(`El ${enemy.name} te ${action} y te hace ${enemyResult.damage} de daño.`);
         if (enemyResult.defeated) {
           this.scene.start('GameOverScene');
           return;
@@ -265,9 +319,6 @@ class GameScene extends Phaser.Scene {
 
       enemy.updateVisibility(this.fov.visibility);
     });
-
-    this.updateFOV();
-    this.updateUI();
   }
 
   updateFOV() {
