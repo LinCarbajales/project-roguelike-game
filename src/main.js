@@ -174,6 +174,13 @@ class GameScene extends Phaser.Scene {
 
     this.updateFOV();
     this.updateUI();
+
+    // La cámara te sigue cuando el mapa es grande
+    const mapPixelWidth  = levelConfig.mapWidth  * TILE_SIZE;
+    const mapPixelHeight = levelConfig.mapHeight * TILE_SIZE;
+
+    this.cameras.main.setBounds(0, 0, mapPixelWidth, mapPixelHeight);
+    this.cameras.main.startFollow(this.playerText, true, 0.1, 0.1);
   }
 
   addLog(message) {
@@ -369,6 +376,8 @@ class GameOverScene extends Phaser.Scene {
     }).setOrigin(0.5);
 
     this.input.keyboard.on('keydown-R', () => {
+      this.registry.set('levelIndex', 0);
+      this.registry.set('player', { hp: 30, maxHp: 30, attack: 6, defense: 2 });
       this.scene.start('GameScene');
     });
   }
