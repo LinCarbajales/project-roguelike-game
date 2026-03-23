@@ -10,7 +10,8 @@ export const LEVELS = [
     },
     enemies: [
       { symbol: 'g', name: 'goblin', color: '#ff6600', hp: 10, attack: 4, defense: 1, visionRadius: 6, count: 'perRoom' }
-    ]
+    ],
+    potions: 1
   },
   {
     level: 2,
@@ -22,9 +23,10 @@ export const LEVELS = [
       stairs: '#ffff00'
     },
     enemies: [
-      { symbol: 'g', name: 'goblin',color: '#ff6600', hp: 12, attack: 4, defense: 1, visionRadius: 6, count: 3 },
-      { symbol: 'o', name: 'orco', color: '#ff0000', hp: 20, attack: 5, defense: 2, visionRadius: 8, count: 1 }
-    ]
+      { symbol: 'g', name: 'goblin',color: '#ff6600', hp: 10, attack: 4, defense: 1, visionRadius: 6, count: 3 },
+      { symbol: 'o', name: 'orco', color: '#ff0000', hp: 20, attack: 5, defense: 2, visionRadius: 8, count: 1 },
+    ],
+    potions: 2
   },
   {
     level: 3,
@@ -37,8 +39,9 @@ export const LEVELS = [
     },
     enemies: [
       { symbol: 'g', name: 'goblin', color: '#ff6600', hp: 14, attack: 4, defense: 1, visionRadius: 6, count: 'perRoom' },
-      { symbol: 'o', name: 'orco', color: '#ff0000', hp: 25, attack: 6, defense: 3, visionRadius: 8, count: 1 }
-    ]
+      { symbol: 'o', name: 'orco', color: '#ff0000', hp: 20, attack: 5, defense: 2, visionRadius: 8, count: 2 }
+    ],
+    potions: 2
   }
 ];
 

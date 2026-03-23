@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import MapGenerator from './MapGenerator.js';
 import FOV from './FOV.js';
 import Enemy from './Enemy.js';
+import Potion from './Potion.js';
 import Combat from './Combat.js';
 import { LEVELS } from './levels.js';
 
@@ -143,6 +144,24 @@ class GameScene extends Phaser.Scene {
       }
     ).setDepth(1).setVisible(false);
 
+    // Pociones, siempre count numérico
+    this.potions = [];
+    const availableRooms = [...rooms.slice(1)];
+    for (let i = 0; i < levelConfig.potions; i++) {
+      if (availableRooms.length === 0) break;
+      const randomIndex = Math.floor(Math.random() * availableRooms.length);
+      const room = availableRooms.splice(randomIndex, 1)[0];
+
+      // Bucle para que la poción no coincida con la escalera
+      let ex, ey;
+      do {
+        ex = Math.floor(Math.random() * room.w) + room.x;
+        ey = Math.floor(Math.random() * room.h) + room.y;
+      } while (ex === this.stairsX && ey === this.stairsY);
+
+      this.potions.push(new Potion(ex, ey, this));
+      }
+
     // UI
     this.hpText = this.add.text(10, 610, '', {
       fontSize: '14px', color: '#ffffff', fontFamily: 'monospace'
@@ -199,6 +218,10 @@ class GameScene extends Phaser.Scene {
 
   getEnemyAt(x, y) {
     return this.enemies.find(e => e.alive && e.x === x && e.y === y);
+  }
+
+  getPotionAt(x, y) {
+    return this.potions.find(e => !e.pickedup && e.x === x && e.y === y);
   }
 
   getRandomAttack(actions) {
@@ -263,7 +286,18 @@ class GameScene extends Phaser.Scene {
         // Comprobar que no hay enemigo vivo en la casilla destino
         const enemyInWay = this.getEnemyAt(newX, newY);
         if (enemyInWay) return;
-        
+
+        //Si hay poción en la casilla de destino
+        const potionInFloor = this.getPotionAt(newX, newY);
+        if (potionInFloor) {
+          const newHp = Math.min(this.player.hp + 10, this.player.maxHp);
+          const healed = newHp - this.player.hp;
+          this.addLog(`Recoges la poción de sanación y te curas ${healed} de vida.`);
+          this.player.hp = newHp;
+          potionInFloor.pickup();
+        }
+
+        // Movimiento
         this.lastMove = time;
         this.playerX = newX;
         this.playerY = newY;
@@ -353,6 +387,10 @@ class GameScene extends Phaser.Scene {
 
     if (this.enemies) {
       this.enemies.forEach(enemy => enemy.updateVisibility(this.fov.visibility));
+    }
+
+    if (this.potions) {
+      this.potions.forEach(potion => potion.updateVisibility(this.fov.visibility));
     }
   }
 }
